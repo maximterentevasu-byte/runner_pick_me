@@ -199,6 +199,8 @@ if (NODE_ENV === 'production') {
   console.log('Bot polling started');
 }
 
+const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log("Server started on port", PORT);
 });
