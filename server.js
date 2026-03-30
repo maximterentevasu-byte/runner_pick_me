@@ -78,9 +78,9 @@ bot.on('message:web_app_data', async (ctx) => {
     if (payload?.type !== 'score' || typeof payload.score !== 'number') return;
 
     const telegramUser = ctx.from;
+    const bestScore = await getUserBestScore(telegramUser.id);
     const top = await getTopPlayers(1000);
     const place = top.findIndex((row) => Number(row.telegram_id) === Number(telegramUser.id)) + 1;
-    const bestScore = await getUserBestScore(telegramUser.id);
 
     await ctx.reply(
       [
@@ -199,8 +199,6 @@ if (NODE_ENV === 'production') {
   console.log('Bot polling started');
 }
 
-const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
-  console.log("Server started on port", PORT);
+  console.log('Server started on port', PORT);
 });
