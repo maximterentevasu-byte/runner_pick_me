@@ -215,7 +215,7 @@ function update(deltaMs) {
   const t = deltaMs / 16.666;
   state.timeMs += deltaMs;
   state.frame += t;
-  const runAnimSpeed = 0.18 + state.speed * 0.045;
+  const runAnimSpeed = (0.18 + state.speed * 0.045) * 1.3;
   state.runCycle += deltaMs * runAnimSpeed;
   state.cameraX += state.speed * t * 0.38;
   state.speed += 0.0023 * t;
