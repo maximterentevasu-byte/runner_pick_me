@@ -57,6 +57,8 @@ const PLAYER_SCALE = 1.10;
 const GROUND_SURFACE_COLOR = { r: 255, g: 192, b: 221, a: 0.18 };
 const TRACK_COLOR = darkenColor(GROUND_SURFACE_COLOR, 0.30);
 const TRACK_HEIGHT = Math.round((62 * OBSTACLE_SCALE) / 2);
+const SURFACE_TOP_Y = WORLD.floorY - 8;
+const OBSTACLE_BASELINE_Y = SURFACE_TOP_Y + 1;
 canvas.width = WORLD.width;
 canvas.height = WORLD.height;
 
@@ -159,17 +161,54 @@ function spawnObstacle() {
   else if (typeRoll > 0.33) type = 'sign';
 
   const settings = {
-    puddle: { w: scaleSize(64, OBSTACLE_SCALE), h: scaleSize(18, OBSTACLE_SCALE), offsetY: 8 },
-    bucket: { w: scaleSize(48, OBSTACLE_SCALE), h: scaleSize(56, OBSTACLE_SCALE), offsetY: 0 },
-    sign: { w: scaleSize(54, OBSTACLE_SCALE), h: scaleSize(62, OBSTACLE_SCALE), offsetY: 0 }
+    puddle: {
+      w: scaleSize(64, OBSTACLE_SCALE),
+      h: scaleSize(18, OBSTACLE_SCALE),
+      groundInset: scaleSize(8, OBSTACLE_SCALE),
+      drawOffsetX: -4,
+      drawW: scaleSize(74, OBSTACLE_SCALE),
+      drawH: scaleSize(26, OBSTACLE_SCALE),
+      drawBottomInset: 4,
+      shadowW: scaleSize(18, OBSTACLE_SCALE),
+      shadowH: 4
+    },
+    bucket: {
+      w: scaleSize(48, OBSTACLE_SCALE),
+      h: scaleSize(56, OBSTACLE_SCALE),
+      groundInset: 0,
+      drawOffsetX: -8,
+      drawW: scaleSize(62, OBSTACLE_SCALE),
+      drawH: scaleSize(72, OBSTACLE_SCALE),
+      drawBottomInset: 1,
+      shadowW: scaleSize(14, OBSTACLE_SCALE),
+      shadowH: 5
+    },
+    sign: {
+      w: scaleSize(54, OBSTACLE_SCALE),
+      h: scaleSize(62, OBSTACLE_SCALE),
+      groundInset: 0,
+      drawOffsetX: -4,
+      drawW: scaleSize(60, OBSTACLE_SCALE),
+      drawH: scaleSize(70, OBSTACLE_SCALE),
+      drawBottomInset: 2,
+      shadowW: scaleSize(13, OBSTACLE_SCALE),
+      shadowH: 4
+    }
   }[type];
 
   state.obstacles.push({
     type,
     x: WORLD.width + 24,
-    y: WORLD.floorY - settings.h,
+    y: OBSTACLE_BASELINE_Y - settings.h + settings.groundInset,
     w: settings.w,
     h: settings.h,
+    groundY: OBSTACLE_BASELINE_Y,
+    drawOffsetX: settings.drawOffsetX,
+    drawW: settings.drawW,
+    drawH: settings.drawH,
+    drawBottomInset: settings.drawBottomInset,
+    shadowW: settings.shadowW,
+    shadowH: settings.shadowH,
     passed: false
   });
 }
@@ -313,7 +352,7 @@ function drawBackground() {
   ctx.fillRect(0, WORLD.floorY - 8, WORLD.width, 10);
 
   ctx.fillStyle = rgba(TRACK_COLOR);
-  ctx.fillRect(0, WORLD.floorY - Math.round(TRACK_HEIGHT * 0.5), WORLD.width, TRACK_HEIGHT);
+  ctx.fillRect(0, SURFACE_TOP_Y - Math.round(TRACK_HEIGHT * 0.7), WORLD.width, TRACK_HEIGHT);
 }
 
 function currentRunFrame() {
@@ -352,16 +391,33 @@ function drawPlayer() {
 }
 function drawObstacle(o) {
   let img = assets.puddle;
-  let dx = o.x, dy = o.y, dw = o.w, dh = o.h;
 
   if (o.type === 'bucket') img = assets.bucket;
   if (o.type === 'sign') img = assets.sign;
 
+  const drawW = o.drawW || o.w;
+  const drawH = o.drawH || o.h;
+  const dx = o.x + (o.drawOffsetX || 0);
+  const bottomY = (o.groundY || OBSTACLE_BASELINE_Y) + (o.drawBottomInset || 0);
+  const dy = bottomY - drawH;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(38, 22, 44, 0.12)';
+  ctx.beginPath();
+  ctx.ellipse(
+    o.x + o.w * 0.5,
+    (o.groundY || OBSTACLE_BASELINE_Y) + 3,
+    o.shadowW || Math.max(12, o.w * 0.28),
+    o.shadowH || 4,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+  ctx.restore();
+
   if (img.complete && img.naturalWidth > 0) {
-    if (o.type === 'bucket') { dx -= 8; dy -= 12; dw = scaleSize(62, OBSTACLE_SCALE); dh = scaleSize(72, OBSTACLE_SCALE); }
-    else if (o.type === 'sign') { dx -= 4; dy -= 6; dw = scaleSize(60, OBSTACLE_SCALE); dh = scaleSize(70, OBSTACLE_SCALE); }
-    else if (o.type === 'puddle') { dx -= 4; dy -= 4; dw = scaleSize(74, OBSTACLE_SCALE); dh = scaleSize(26, OBSTACLE_SCALE); }
-    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.drawImage(img, dx, dy, drawW, drawH);
   } else {
     ctx.fillStyle = '#39424f';
     ctx.fillRect(o.x, o.y, o.w, o.h);
