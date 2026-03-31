@@ -54,7 +54,7 @@ function formatUserName(row) {
 
 function formatTopMessage(rows, title = 'Runner: топ-10') {
   const lines = rows.map((row, index) => `${index + 1}. ${formatUserName(row)} — ${row.best_score}`);
-  return [title, ...lines].join('\\n');
+  return [title, ...lines].join('\n');
 }
 
 function getPromoDateParts(date = new Date()) {
@@ -66,7 +66,11 @@ function getPromoDateParts(date = new Date()) {
   });
 
   const parts = formatter.formatToParts(date);
-  const map = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  const map = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
 
   return {
     iso: `${map.year}-${map.month}-${map.day}`,
@@ -81,7 +85,7 @@ function buildPromoMessage(promoType, displayDate) {
       'Держи промокод для Чемпионов на скидку 40%: APPS40.',
       `Промокод действует только ${displayDate}.`,
       'Ждем тебя в нашем магазине!'
-    ].join('\\n');
+    ].join('\n');
   }
 
   return [
@@ -89,17 +93,31 @@ function buildPromoMessage(promoType, displayDate) {
     'Держи приветсвенный промокод на скидку 10%: APPS10.',
     `Промокод действует только ${displayDate}.`,
     'Ждем тебя в нашем магазине!'
-  ].join('\\n');
+  ].join('\n');
 }
 
 async function maybeSendPromoMessage(telegramId, promoType) {
   const { iso, display } = getPromoDateParts();
-  const canSend = await canSendPromoMessage({ telegramId, promoType, sentOnDate: iso });
-  if (!canSend) return false;
+  const canSend = await canSendPromoMessage({
+    telegramId,
+    promoType,
+    sentOnDate: iso
+  });
+
+  if (!canSend) {
+    console.log('Promo skipped: already sent today', { telegramId, promoType, sentOnDate: iso });
+    return false;
+  }
 
   const text = buildPromoMessage(promoType, display);
   await bot.api.sendMessage(telegramId, text);
-  await markPromoMessageSent({ telegramId, promoType, sentOnDate: iso });
+  await markPromoMessageSent({
+    telegramId,
+    promoType,
+    sentOnDate: iso
+  });
+
+  console.log('Promo sent', { telegramId, promoType, sentOnDate: iso });
   return true;
 }
 
@@ -114,7 +132,7 @@ bot.command('start', async (ctx) => {
       'Команды:',
       '/runner — открыть игру',
       '/toprunner — показать топ игроков'
-    ].join('\\n'),
+    ].join('\n'),
     { reply_markup: buildGameKeyboard(baseUrl) }
   );
 });
@@ -150,7 +168,7 @@ bot.on('message:web_app_data', async (ctx) => {
         `Ваше место в топе: ${place || '-'}`,
         'Топ игроков: /toprunner',
         'Играть ещё: /runner'
-      ].join('\\n')
+      ].join('\n')
     );
   } catch (error) {
     console.error('web_app_data handler error', error);
@@ -242,7 +260,13 @@ app.post('/api/score', async (req, res) => {
       const promoType = result.isNewGlobalRecord ? PROMO_TYPES.champion : PROMO_TYPES.standard;
       await maybeSendPromoMessage(telegramUser.id, promoType);
     } catch (promoError) {
-      console.error('promo send error', promoError);
+      console.error('promo send error', {
+        telegramId: telegramUser.id,
+        score,
+        isNewGlobalRecord: result.isNewGlobalRecord,
+        message: promoError?.message,
+        stack: promoError?.stack
+      });
     }
 
     return res.json({
