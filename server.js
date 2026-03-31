@@ -1,7 +1,14 @@
 import 'dotenv/config';
 import express from 'express';
 import { Bot, InlineKeyboard, webhookCallback } from 'grammy';
-import { initDb, getTopPlayers, saveScore, getUserBestScore } from './lib/db.js';
+import {
+  initDb,
+  getTopPlayers,
+  saveScore,
+  getUserBestScore,
+  canSendPromoMessage,
+  markPromoMessageSent
+} from './lib/db.js';
 import { verifyTelegramWebAppData, parseTelegramWebAppUser } from './lib/telegramAuth.js';
 
 const {
@@ -25,6 +32,12 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '256kb' }));
 app.use('/webapp', express.static('webapp', { extensions: ['html'] }));
 
+const PROMO_TIME_ZONE = 'Asia/Yekaterinburg';
+const PROMO_TYPES = {
+  standard: 'standard',
+  champion: 'champion'
+};
+
 function getBaseUrl(req) {
   if (APP_URL) return APP_URL.replace(/\/$/, '');
   return `${req.protocol}://${req.get('host')}`;
@@ -41,19 +54,71 @@ function formatUserName(row) {
 
 function formatTopMessage(rows, title = 'Runner: топ-10') {
   const lines = rows.map((row, index) => `${index + 1}. ${formatUserName(row)} — ${row.best_score}`);
-  return [title, ...lines].join('\n');
+  return [title, ...lines].join('
+');
+}
+
+function getPromoDateParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: PROMO_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+
+  const parts = formatter.formatToParts(date);
+  const map = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+
+  return {
+    iso: `${map.year}-${map.month}-${map.day}`,
+    display: `${map.day}.${map.month}.${map.year}`
+  };
+}
+
+function buildPromoMessage(promoType, displayDate) {
+  if (promoType === PROMO_TYPES.champion) {
+    return [
+      'Поздравляю! Ты установил новый рекорд!',
+      'Держи промокод для Чемпионов на скидку 40%: APPS40.',
+      `Промокод действует только ${displayDate}.`,
+      'Ждем тебя в нашем магазине!'
+    ].join('
+');
+  }
+
+  return [
+    'На связи Элис!',
+    'Держи приветсвенный промокод на скидку 10%: APPS10.',
+    `Промокод действует только ${displayDate}.`,
+    'Ждем тебя в нашем магазине!'
+  ].join('
+');
+}
+
+async function maybeSendPromoMessage(telegramId, promoType) {
+  const { iso, display } = getPromoDateParts();
+  const canSend = await canSendPromoMessage({ telegramId, promoType, sentOnDate: iso });
+  if (!canSend) return false;
+
+  const text = buildPromoMessage(promoType, display);
+  await bot.api.sendMessage(telegramId, text);
+  await markPromoMessageSent({ telegramId, promoType, sentOnDate: iso });
+  return true;
 }
 
 bot.command('start', async (ctx) => {
   const baseUrl = APP_URL?.replace(/\/$/, '') || `http://localhost:${PORT}`;
   await ctx.reply(
     [
-      'Привет! Это Runner внутри Telegram Mini App.',
-      'Нажми кнопку ниже, чтобы открыть игру.',
+      'Привет! Это мини-игра "Беги, Элис..." от Pick me.',
+      'Играй и зарабатывай промо коды на скидку.',
+      'Ждем тебя в гости!',
+      'А сейчас жми кнопку ниже, чтобы открыть игру.',
       'Команды:',
       '/runner — открыть игру',
       '/toprunner — показать топ игроков'
-    ].join('\n'),
+    ].join('
+'),
     { reply_markup: buildGameKeyboard(baseUrl) }
   );
 });
@@ -89,7 +154,8 @@ bot.on('message:web_app_data', async (ctx) => {
         `Ваше место в топе: ${place || '-'}`,
         'Топ игроков: /toprunner',
         'Играть ещё: /runner'
-      ].join('\n')
+      ].join('
+')
     );
   } catch (error) {
     console.error('web_app_data handler error', error);
@@ -177,12 +243,20 @@ app.post('/api/score', async (req, res) => {
     const place = top.findIndex((row) => Number(row.telegram_id) === Number(telegramUser.id)) + 1;
     const bestScore = await getUserBestScore(telegramUser.id);
 
+    try {
+      const promoType = result.isNewGlobalRecord ? PROMO_TYPES.champion : PROMO_TYPES.standard;
+      await maybeSendPromoMessage(telegramUser.id, promoType);
+    } catch (promoError) {
+      console.error('promo send error', promoError);
+    }
+
     return res.json({
       ok: true,
       score,
       bestScore,
       place,
-      isNewRecord: result.isNewRecord
+      isNewRecord: result.isNewPersonalRecord,
+      isNewGlobalRecord: result.isNewGlobalRecord
     });
   } catch (error) {
     console.error('/api/score error', error);
