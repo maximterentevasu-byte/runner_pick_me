@@ -26,6 +26,8 @@ if (NODE_ENV === 'production' && !APP_URL) throw new Error('APP_URL is required 
 await initDb();
 
 const bot = new Bot(BOT_TOKEN);
+await bot.init();
+
 const app = express();
 
 app.disable('x-powered-by');
@@ -90,35 +92,35 @@ function buildPromoMessage(promoType, displayDate) {
 
   return [
     'На связи Элис!',
-    'Держи приветсвенный промокод на скидку 10%: APPS10.',
+    'Держи приветственный промокод на скидку 10%: APPS10.',
     `Промокод действует только ${displayDate}.`,
     'Ждем тебя в нашем магазине!'
   ].join('\n');
 }
 
-async function maybeSendPromoMessage(telegramId, promoType) {
+async function maybeSendPromoMessageToChat(chatId, promoType) {
   const { iso, display } = getPromoDateParts();
   const canSend = await canSendPromoMessage({
-    telegramId,
+    telegramId: chatId,
     promoType,
     sentOnDate: iso
   });
 
   if (!canSend) {
-    console.log('Promo skipped: already sent today', { telegramId, promoType, sentOnDate: iso });
-    return false;
+    console.log('Promo skipped: already sent today', { chatId, promoType, sentOnDate: iso });
+    return { sent: false, reason: 'already_sent_today', sentOnDate: iso };
   }
 
   const text = buildPromoMessage(promoType, display);
-  await bot.api.sendMessage(telegramId, text);
+  await bot.api.sendMessage(chatId, text);
   await markPromoMessageSent({
-    telegramId,
+    telegramId: chatId,
     promoType,
     sentOnDate: iso
   });
 
-  console.log('Promo sent', { telegramId, promoType, sentOnDate: iso });
-  return true;
+  console.log('Promo sent', { chatId, promoType, sentOnDate: iso });
+  return { sent: true, sentOnDate: iso };
 }
 
 bot.command('start', async (ctx) => {
@@ -126,7 +128,7 @@ bot.command('start', async (ctx) => {
   await ctx.reply(
     [
       'Привет! Это мини-игра "Беги, Элис..." от Pick me.',
-      'Играй и зарабатывай промо коды на скидку.',
+      'Играй и зарабатывай промокоды на скидку.',
       'Ждем тебя в гости!',
       'А сейчас жми кнопку ниже, чтобы открыть игру.',
       'Команды:',
@@ -154,6 +156,23 @@ bot.command('toprunner', async (ctx) => {
 bot.on('message:web_app_data', async (ctx) => {
   try {
     const payload = JSON.parse(ctx.message.web_app_data.data);
+
+    if (payload?.type === 'promo_request') {
+      if (!payload.promoType || !Object.values(PROMO_TYPES).includes(payload.promoType)) return;
+
+      try {
+        await maybeSendPromoMessageToChat(ctx.chat.id, payload.promoType);
+      } catch (error) {
+        console.error('promo_request handler error', {
+          chatId: ctx.chat.id,
+          promoType: payload.promoType,
+          message: error?.message,
+          stack: error?.stack
+        });
+      }
+      return;
+    }
+
     if (payload?.type !== 'score' || typeof payload.score !== 'number') return;
 
     const telegramUser = ctx.from;
@@ -255,19 +274,7 @@ app.post('/api/score', async (req, res) => {
     const top = await getTopPlayers(1000);
     const place = top.findIndex((row) => Number(row.telegram_id) === Number(telegramUser.id)) + 1;
     const bestScore = await getUserBestScore(telegramUser.id);
-
-    try {
-      const promoType = result.isNewGlobalRecord ? PROMO_TYPES.champion : PROMO_TYPES.standard;
-      await maybeSendPromoMessage(telegramUser.id, promoType);
-    } catch (promoError) {
-      console.error('promo send error', {
-        telegramId: telegramUser.id,
-        score,
-        isNewGlobalRecord: result.isNewGlobalRecord,
-        message: promoError?.message,
-        stack: promoError?.stack
-      });
-    }
+    const promoType = result.isNewGlobalRecord ? PROMO_TYPES.champion : PROMO_TYPES.standard;
 
     return res.json({
       ok: true,
@@ -275,7 +282,8 @@ app.post('/api/score', async (req, res) => {
       bestScore,
       place,
       isNewRecord: result.isNewPersonalRecord,
-      isNewGlobalRecord: result.isNewGlobalRecord
+      isNewGlobalRecord: result.isNewGlobalRecord,
+      promoType
     });
   } catch (error) {
     console.error('/api/score error', error);
