@@ -79,6 +79,7 @@ const state = {
   obstacles: [],
   coinsList: [],
   particles: [],
+  runId: 0,
   player: {
     x: WORLD.playerX,
     y: WORLD.floorY - Math.round(124 * PLAYER_SCALE),
@@ -121,6 +122,7 @@ function showStartOverlay(show) { startOverlay.classList.toggle('visible', show)
 function showGameOver(show) { gameOverOverlay.classList.toggle('visible', show); }
 
 function resetGame() {
+  state.runId += 1;
   state.running = true;
   state.gameOver = false;
   state.score = 0;
@@ -151,8 +153,17 @@ function resetGame() {
   showGameOver(false);
 }
 function startOrJump() {
-  if (!state.running) { resetGame(); return; }
+  if (!state.running) {
+    resetGame();
+    draw();
+    return;
+  }
   state.player.jumpBufferMs = 140;
+}
+
+function restartGame() {
+  resetGame();
+  draw();
 }
 function spawnObstacle() {
   const typeRoll = Math.random();
@@ -519,6 +530,7 @@ function draw() {
   drawParticles();
 }
 async function endGame() {
+  const endedRunId = state.runId;
   state.running = false;
   state.gameOver = true;
   statusEl.textContent = 'Проигрыш';
@@ -529,8 +541,12 @@ async function endGame() {
   if (!state.sentScore) {
     state.sentScore = true;
     await saveScore();
+    if (state.runId !== endedRunId) return;
     await loadLeaderboard();
+    if (state.runId !== endedRunId) return;
   }
+
+  if (state.runId !== endedRunId || state.running) return;
   showGameOver(true);
 }
 async function saveScore() {
@@ -578,7 +594,7 @@ async function loadLeaderboard() {
 function attachEvents() {
   canvas.addEventListener('pointerdown', startOrJump);
   jumpBtn.addEventListener('click', startOrJump);
-  restartBtn.addEventListener('click', resetGame);
+  restartBtn.addEventListener('click', restartGame);
   window.addEventListener('keydown', (event) => {
     if (event.code === 'Space' || event.code === 'ArrowUp') {
       event.preventDefault();
