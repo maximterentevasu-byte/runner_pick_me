@@ -57,8 +57,6 @@ const PLAYER_SCALE = 1.10;
 const GROUND_SURFACE_COLOR = { r: 255, g: 192, b: 221, a: 0.18 };
 const TRACK_COLOR = darkenColor(GROUND_SURFACE_COLOR, 0.30);
 const TRACK_HEIGHT = Math.round((62 * OBSTACLE_SCALE) / 2);
-const SURFACE_TOP_Y = WORLD.floorY - 8;
-const OBSTACLE_BASELINE_Y = SURFACE_TOP_Y + 7;
 canvas.width = WORLD.width;
 canvas.height = WORLD.height;
 
@@ -161,62 +159,17 @@ function spawnObstacle() {
   else if (typeRoll > 0.33) type = 'sign';
 
   const settings = {
-    puddle: {
-      w: scaleSize(64, OBSTACLE_SCALE),
-      h: scaleSize(18, OBSTACLE_SCALE),
-      groundInset: scaleSize(10, OBSTACLE_SCALE),
-      drawOffsetX: -4,
-      drawW: scaleSize(74, OBSTACLE_SCALE),
-      drawH: scaleSize(26, OBSTACLE_SCALE),
-      drawBottomInset: 7,
-      contourShadowInsetX: 5,
-      contourShadowLift: 1,
-      contourShadowBlur: 3,
-      contourShadowAlpha: 0.18
-    },
-    bucket: {
-      w: scaleSize(48, OBSTACLE_SCALE),
-      h: scaleSize(56, OBSTACLE_SCALE),
-      groundInset: 2,
-      drawOffsetX: -8,
-      drawW: scaleSize(62, OBSTACLE_SCALE),
-      drawH: scaleSize(72, OBSTACLE_SCALE),
-      drawBottomInset: 5,
-      contourShadowInsetX: 8,
-      contourShadowLift: 1,
-      contourShadowBlur: 4,
-      contourShadowAlpha: 0.20
-    },
-    sign: {
-      w: scaleSize(54, OBSTACLE_SCALE),
-      h: scaleSize(62, OBSTACLE_SCALE),
-      groundInset: 1,
-      drawOffsetX: -4,
-      drawW: scaleSize(60, OBSTACLE_SCALE),
-      drawH: scaleSize(70, OBSTACLE_SCALE),
-      drawBottomInset: 5,
-      contourShadowInsetX: 10,
-      contourShadowLift: 1,
-      contourShadowBlur: 4,
-      contourShadowAlpha: 0.18
-    }
+    puddle: { w: scaleSize(64, OBSTACLE_SCALE), h: scaleSize(18, OBSTACLE_SCALE), offsetY: 8 },
+    bucket: { w: scaleSize(48, OBSTACLE_SCALE), h: scaleSize(56, OBSTACLE_SCALE), offsetY: 0 },
+    sign: { w: scaleSize(54, OBSTACLE_SCALE), h: scaleSize(62, OBSTACLE_SCALE), offsetY: 0 }
   }[type];
 
   state.obstacles.push({
     type,
     x: WORLD.width + 24,
-    y: OBSTACLE_BASELINE_Y - settings.h + settings.groundInset,
+    y: WORLD.floorY - settings.h,
     w: settings.w,
     h: settings.h,
-    groundY: OBSTACLE_BASELINE_Y,
-    drawOffsetX: settings.drawOffsetX,
-    drawW: settings.drawW,
-    drawH: settings.drawH,
-    drawBottomInset: settings.drawBottomInset,
-    contourShadowInsetX: settings.contourShadowInsetX,
-    contourShadowLift: settings.contourShadowLift,
-    contourShadowBlur: settings.contourShadowBlur,
-    contourShadowAlpha: settings.contourShadowAlpha,
     passed: false
   });
 }
@@ -360,7 +313,7 @@ function drawBackground() {
   ctx.fillRect(0, WORLD.floorY - 8, WORLD.width, 10);
 
   ctx.fillStyle = rgba(TRACK_COLOR);
-  ctx.fillRect(0, SURFACE_TOP_Y - Math.round(TRACK_HEIGHT * 0.7), WORLD.width, TRACK_HEIGHT);
+  ctx.fillRect(0, WORLD.floorY - Math.round(TRACK_HEIGHT * 0.5), WORLD.width, TRACK_HEIGHT);
 }
 
 function currentRunFrame() {
@@ -399,49 +352,16 @@ function drawPlayer() {
 }
 function drawObstacle(o) {
   let img = assets.puddle;
+  let dx = o.x, dy = o.y, dw = o.w, dh = o.h;
 
   if (o.type === 'bucket') img = assets.bucket;
   if (o.type === 'sign') img = assets.sign;
 
-  const drawW = o.drawW || o.w;
-  const drawH = o.drawH || o.h;
-  const dx = o.x + (o.drawOffsetX || 0);
-  const bottomY = (o.groundY || OBSTACLE_BASELINE_Y) + (o.drawBottomInset || 0);
-  const dy = bottomY - drawH;
-
-  const shadowInsetX = o.contourShadowInsetX || 8;
-  const shadowX = dx + shadowInsetX;
-  const shadowW = Math.max(14, drawW - shadowInsetX * 2);
-  const shadowY = bottomY - (o.contourShadowLift || 1);
-
-  ctx.save();
-  ctx.fillStyle = `rgba(38, 22, 44, ${o.contourShadowAlpha || 0.18})`;
-  ctx.filter = `blur(${o.contourShadowBlur || 4}px)`;
-  ctx.beginPath();
-  ctx.moveTo(shadowX, shadowY);
-  ctx.quadraticCurveTo(
-    shadowX + shadowW * 0.18, shadowY - 2,
-    shadowX + shadowW * 0.32, shadowY
-  );
-  ctx.quadraticCurveTo(
-    shadowX + shadowW * 0.50, shadowY + 1.5,
-    shadowX + shadowW * 0.68, shadowY
-  );
-  ctx.quadraticCurveTo(
-    shadowX + shadowW * 0.82, shadowY - 2,
-    shadowX + shadowW, shadowY
-  );
-  ctx.lineTo(shadowX + shadowW, shadowY + 2);
-  ctx.quadraticCurveTo(
-    shadowX + shadowW * 0.50, shadowY + 5,
-    shadowX, shadowY + 2
-  );
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
   if (img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, dx, dy, drawW, drawH);
+    if (o.type === 'bucket') { dx -= 8; dy -= 12; dw = scaleSize(62, OBSTACLE_SCALE); dh = scaleSize(72, OBSTACLE_SCALE); }
+    else if (o.type === 'sign') { dx -= 4; dy -= 6; dw = scaleSize(60, OBSTACLE_SCALE); dh = scaleSize(70, OBSTACLE_SCALE); }
+    else if (o.type === 'puddle') { dx -= 4; dy -= 4; dw = scaleSize(74, OBSTACLE_SCALE); dh = scaleSize(26, OBSTACLE_SCALE); }
+    ctx.drawImage(img, dx, dy, dw, dh);
   } else {
     ctx.fillStyle = '#39424f';
     ctx.fillRect(o.x, o.y, o.w, o.h);
