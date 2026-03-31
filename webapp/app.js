@@ -53,6 +53,11 @@ assets.sign.src = './assets/obstacle-sign.png';
 assets.coin.src = './assets/coin.png';
 
 const WORLD = { width: 420, height: 640, floorY: 530, playerX: 64 };
+const OBSTACLE_SCALE = 1.05;
+const PLAYER_SCALE = 1.10;
+const GROUND_SURFACE_COLOR = { r: 255, g: 192, b: 221, a: 0.18 };
+const TRACK_COLOR = darkenColor(GROUND_SURFACE_COLOR, 0.30);
+const TRACK_HEIGHT = Math.round((62 * OBSTACLE_SCALE) / 2);
 canvas.width = WORLD.width;
 canvas.height = WORLD.height;
 
@@ -74,15 +79,31 @@ const state = {
   particles: [],
   player: {
     x: WORLD.playerX,
-    y: WORLD.floorY - 124,
-    w: 78,
-    h: 124,
+    y: WORLD.floorY - Math.round(124 * PLAYER_SCALE),
+    w: Math.round(78 * PLAYER_SCALE),
+    h: Math.round(124 * PLAYER_SCALE),
     vy: 0,
     onGround: true,
     jumpBufferMs: 0
   }
 };
 
+
+function darkenColor(color, amount) {
+  const factor = Math.max(0, 1 - amount);
+  return {
+    r: Math.round(color.r * factor),
+    g: Math.round(color.g * factor),
+    b: Math.round(color.b * factor),
+    a: color.a
+  };
+}
+function rgba(color) {
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
+}
+function scaleSize(value, scale) {
+  return Math.round(value * scale);
+}
 function getTelegramUser() {
   return tg?.initDataUnsafe?.user || null;
 }
@@ -138,9 +159,9 @@ function spawnObstacle() {
   else if (typeRoll > 0.33) type = 'sign';
 
   const settings = {
-    puddle: { w: 64, h: 18, offsetY: 8 },
-    bucket: { w: 48, h: 56, offsetY: 0 },
-    sign: { w: 54, h: 62, offsetY: 0 }
+    puddle: { w: scaleSize(64, OBSTACLE_SCALE), h: scaleSize(18, OBSTACLE_SCALE), offsetY: 8 },
+    bucket: { w: scaleSize(48, OBSTACLE_SCALE), h: scaleSize(56, OBSTACLE_SCALE), offsetY: 0 },
+    sign: { w: scaleSize(54, OBSTACLE_SCALE), h: scaleSize(62, OBSTACLE_SCALE), offsetY: 0 }
   }[type];
 
   state.obstacles.push({
@@ -286,9 +307,13 @@ function drawBackground() {
   ctx.fillStyle = overlay;
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
-  ctx.fillStyle = 'rgba(255, 192, 221, 0.18)';
+  ctx.fillStyle = rgba(GROUND_SURFACE_COLOR);
   ctx.fillRect(0, WORLD.floorY - 8, WORLD.width, 10);
+
+  ctx.fillStyle = rgba(TRACK_COLOR);
+  ctx.fillRect(0, WORLD.floorY - Math.round(TRACK_HEIGHT * 0.5), WORLD.width, TRACK_HEIGHT);
 }
+
 function currentRunFrame() {
   const idx = Math.floor(state.frame / 3) % assets.run.length;
   return assets.run[idx];
@@ -302,21 +327,21 @@ function drawPlayer() {
   ctx.translate(p.x, p.y + bob);
 
   ctx.fillStyle = 'rgba(38, 22, 44, 0.16)';
-  const shadowW = p.onGround ? 24 : 18;
+  const shadowW = p.onGround ? 26 : 20;
   ctx.beginPath();
-  ctx.ellipse(34, p.h + 6, shadowW, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(p.w * 0.48, p.h + 6, shadowW, 6, 0, 0, Math.PI * 2);
   ctx.fill();
 
   if (img.complete && img.naturalWidth > 0) {
     const ratio = img.naturalWidth / img.naturalHeight;
-    const drawH = p.onGround ? 133 : 131;
+    const drawH = p.onGround ? scaleSize(133, PLAYER_SCALE) : scaleSize(131, PLAYER_SCALE);
     const drawW = drawH * ratio;
-    const offsetX = -12;
-    const offsetY = -10;
+    const offsetX = -14;
+    const offsetY = -12;
     ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
   } else {
     ctx.fillStyle = '#ff4ea4';
-    ctx.fillRect(8, 0, 44, 82);
+    ctx.fillRect(8, 0, scaleSize(44, PLAYER_SCALE), scaleSize(82, PLAYER_SCALE));
   }
   ctx.restore();
 }
@@ -328,9 +353,9 @@ function drawObstacle(o) {
   if (o.type === 'sign') img = assets.sign;
 
   if (img.complete && img.naturalWidth > 0) {
-    if (o.type === 'bucket') { dx -= 8; dy -= 12; dw = 62; dh = 72; }
-    else if (o.type === 'sign') { dx -= 4; dy -= 6; dw = 60; dh = 70; }
-    else if (o.type === 'puddle') { dx -= 4; dy -= 4; dw = 74; dh = 26; }
+    if (o.type === 'bucket') { dx -= 8; dy -= 12; dw = scaleSize(62, OBSTACLE_SCALE); dh = scaleSize(72, OBSTACLE_SCALE); }
+    else if (o.type === 'sign') { dx -= 4; dy -= 6; dw = scaleSize(60, OBSTACLE_SCALE); dh = scaleSize(70, OBSTACLE_SCALE); }
+    else if (o.type === 'puddle') { dx -= 4; dy -= 4; dw = scaleSize(74, OBSTACLE_SCALE); dh = scaleSize(26, OBSTACLE_SCALE); }
     ctx.drawImage(img, dx, dy, dw, dh);
   } else {
     ctx.fillStyle = '#39424f';
