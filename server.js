@@ -54,8 +54,7 @@ function formatUserName(row) {
 
 function formatTopMessage(rows, title = 'Runner: топ-10') {
   const lines = rows.map((row, index) => `${index + 1}. ${formatUserName(row)} — ${row.best_score}`);
-  return [title, ...lines].join('
-');
+  return [title, ...lines].join('\\n');
 }
 
 function getPromoDateParts(date = new Date()) {
@@ -82,8 +81,7 @@ function buildPromoMessage(promoType, displayDate) {
       'Держи промокод для Чемпионов на скидку 40%: APPS40.',
       `Промокод действует только ${displayDate}.`,
       'Ждем тебя в нашем магазине!'
-    ].join('
-');
+    ].join('\\n');
   }
 
   return [
@@ -91,8 +89,7 @@ function buildPromoMessage(promoType, displayDate) {
     'Держи приветсвенный промокод на скидку 10%: APPS10.',
     `Промокод действует только ${displayDate}.`,
     'Ждем тебя в нашем магазине!'
-  ].join('
-');
+  ].join('\\n');
 }
 
 async function maybeSendPromoMessage(telegramId, promoType) {
@@ -117,8 +114,7 @@ bot.command('start', async (ctx) => {
       'Команды:',
       '/runner — открыть игру',
       '/toprunner — показать топ игроков'
-    ].join('
-'),
+    ].join('\\n'),
     { reply_markup: buildGameKeyboard(baseUrl) }
   );
 });
@@ -154,8 +150,7 @@ bot.on('message:web_app_data', async (ctx) => {
         `Ваше место в топе: ${place || '-'}`,
         'Топ игроков: /toprunner',
         'Играть ещё: /runner'
-      ].join('
-')
+      ].join('\\n')
     );
   } catch (error) {
     console.error('web_app_data handler error', error);
