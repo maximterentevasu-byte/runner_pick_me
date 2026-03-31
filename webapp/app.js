@@ -58,7 +58,7 @@ const GROUND_SURFACE_COLOR = { r: 255, g: 192, b: 221, a: 0.18 };
 const TRACK_COLOR = darkenColor(GROUND_SURFACE_COLOR, 0.30);
 const TRACK_HEIGHT = Math.round((62 * OBSTACLE_SCALE) / 2);
 const SURFACE_TOP_Y = WORLD.floorY - 8;
-const OBSTACLE_BASELINE_Y = SURFACE_TOP_Y + 1;
+const OBSTACLE_BASELINE_Y = SURFACE_TOP_Y + 7;
 canvas.width = WORLD.width;
 canvas.height = WORLD.height;
 
@@ -164,35 +164,41 @@ function spawnObstacle() {
     puddle: {
       w: scaleSize(64, OBSTACLE_SCALE),
       h: scaleSize(18, OBSTACLE_SCALE),
-      groundInset: scaleSize(8, OBSTACLE_SCALE),
+      groundInset: scaleSize(10, OBSTACLE_SCALE),
       drawOffsetX: -4,
       drawW: scaleSize(74, OBSTACLE_SCALE),
       drawH: scaleSize(26, OBSTACLE_SCALE),
-      drawBottomInset: 4,
-      shadowW: scaleSize(18, OBSTACLE_SCALE),
-      shadowH: 4
+      drawBottomInset: 7,
+      contourShadowInsetX: 5,
+      contourShadowLift: 1,
+      contourShadowBlur: 3,
+      contourShadowAlpha: 0.18
     },
     bucket: {
       w: scaleSize(48, OBSTACLE_SCALE),
       h: scaleSize(56, OBSTACLE_SCALE),
-      groundInset: 0,
+      groundInset: 2,
       drawOffsetX: -8,
       drawW: scaleSize(62, OBSTACLE_SCALE),
       drawH: scaleSize(72, OBSTACLE_SCALE),
-      drawBottomInset: 1,
-      shadowW: scaleSize(14, OBSTACLE_SCALE),
-      shadowH: 5
+      drawBottomInset: 5,
+      contourShadowInsetX: 8,
+      contourShadowLift: 1,
+      contourShadowBlur: 4,
+      contourShadowAlpha: 0.20
     },
     sign: {
       w: scaleSize(54, OBSTACLE_SCALE),
       h: scaleSize(62, OBSTACLE_SCALE),
-      groundInset: 0,
+      groundInset: 1,
       drawOffsetX: -4,
       drawW: scaleSize(60, OBSTACLE_SCALE),
       drawH: scaleSize(70, OBSTACLE_SCALE),
-      drawBottomInset: 2,
-      shadowW: scaleSize(13, OBSTACLE_SCALE),
-      shadowH: 4
+      drawBottomInset: 5,
+      contourShadowInsetX: 10,
+      contourShadowLift: 1,
+      contourShadowBlur: 4,
+      contourShadowAlpha: 0.18
     }
   }[type];
 
@@ -207,8 +213,10 @@ function spawnObstacle() {
     drawW: settings.drawW,
     drawH: settings.drawH,
     drawBottomInset: settings.drawBottomInset,
-    shadowW: settings.shadowW,
-    shadowH: settings.shadowH,
+    contourShadowInsetX: settings.contourShadowInsetX,
+    contourShadowLift: settings.contourShadowLift,
+    contourShadowBlur: settings.contourShadowBlur,
+    contourShadowAlpha: settings.contourShadowAlpha,
     passed: false
   });
 }
@@ -401,18 +409,34 @@ function drawObstacle(o) {
   const bottomY = (o.groundY || OBSTACLE_BASELINE_Y) + (o.drawBottomInset || 0);
   const dy = bottomY - drawH;
 
+  const shadowInsetX = o.contourShadowInsetX || 8;
+  const shadowX = dx + shadowInsetX;
+  const shadowW = Math.max(14, drawW - shadowInsetX * 2);
+  const shadowY = bottomY - (o.contourShadowLift || 1);
+
   ctx.save();
-  ctx.fillStyle = 'rgba(38, 22, 44, 0.12)';
+  ctx.fillStyle = `rgba(38, 22, 44, ${o.contourShadowAlpha || 0.18})`;
+  ctx.filter = `blur(${o.contourShadowBlur || 4}px)`;
   ctx.beginPath();
-  ctx.ellipse(
-    o.x + o.w * 0.5,
-    (o.groundY || OBSTACLE_BASELINE_Y) + 3,
-    o.shadowW || Math.max(12, o.w * 0.28),
-    o.shadowH || 4,
-    0,
-    0,
-    Math.PI * 2
+  ctx.moveTo(shadowX, shadowY);
+  ctx.quadraticCurveTo(
+    shadowX + shadowW * 0.18, shadowY - 2,
+    shadowX + shadowW * 0.32, shadowY
   );
+  ctx.quadraticCurveTo(
+    shadowX + shadowW * 0.50, shadowY + 1.5,
+    shadowX + shadowW * 0.68, shadowY
+  );
+  ctx.quadraticCurveTo(
+    shadowX + shadowW * 0.82, shadowY - 2,
+    shadowX + shadowW, shadowY
+  );
+  ctx.lineTo(shadowX + shadowW, shadowY + 2);
+  ctx.quadraticCurveTo(
+    shadowX + shadowW * 0.50, shadowY + 5,
+    shadowX, shadowY + 2
+  );
+  ctx.closePath();
   ctx.fill();
   ctx.restore();
 
