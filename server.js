@@ -98,29 +98,29 @@ function buildPromoMessage(promoType, displayDate) {
   ].join('\n');
 }
 
-async function maybeSendPromoMessageToChat(chatId, promoType) {
+async function maybeSendPromoMessage(telegramId, promoType) {
   const { iso, display } = getPromoDateParts();
   const canSend = await canSendPromoMessage({
-    telegramId: chatId,
+    telegramId,
     promoType,
     sentOnDate: iso
   });
 
   if (!canSend) {
-    console.log('Promo skipped: already sent today', { chatId, promoType, sentOnDate: iso });
-    return { sent: false, reason: 'already_sent_today', sentOnDate: iso };
+    console.log('Promo skipped: already sent today', { telegramId, promoType, sentOnDate: iso });
+    return { sent: false, reason: 'already_sent_today' };
   }
 
   const text = buildPromoMessage(promoType, display);
-  await bot.api.sendMessage(chatId, text);
+  await bot.api.sendMessage(telegramId, text);
   await markPromoMessageSent({
-    telegramId: chatId,
+    telegramId,
     promoType,
     sentOnDate: iso
   });
 
-  console.log('Promo sent', { chatId, promoType, sentOnDate: iso });
-  return { sent: true, sentOnDate: iso };
+  console.log('Promo sent', { telegramId, promoType, sentOnDate: iso });
+  return { sent: true };
 }
 
 bot.command('start', async (ctx) => {
@@ -156,23 +156,6 @@ bot.command('toprunner', async (ctx) => {
 bot.on('message:web_app_data', async (ctx) => {
   try {
     const payload = JSON.parse(ctx.message.web_app_data.data);
-
-    if (payload?.type === 'promo_request') {
-      if (!payload.promoType || !Object.values(PROMO_TYPES).includes(payload.promoType)) return;
-
-      try {
-        await maybeSendPromoMessageToChat(ctx.chat.id, payload.promoType);
-      } catch (error) {
-        console.error('promo_request handler error', {
-          chatId: ctx.chat.id,
-          promoType: payload.promoType,
-          message: error?.message,
-          stack: error?.stack
-        });
-      }
-      return;
-    }
-
     if (payload?.type !== 'score' || typeof payload.score !== 'number') return;
 
     const telegramUser = ctx.from;
@@ -275,6 +258,18 @@ app.post('/api/score', async (req, res) => {
     const place = top.findIndex((row) => Number(row.telegram_id) === Number(telegramUser.id)) + 1;
     const bestScore = await getUserBestScore(telegramUser.id);
     const promoType = result.isNewGlobalRecord ? PROMO_TYPES.champion : PROMO_TYPES.standard;
+
+    try {
+      await maybeSendPromoMessage(telegramUser.id, promoType);
+    } catch (promoError) {
+      console.error('promo send error', {
+        telegramId: telegramUser.id,
+        promoType,
+        message: promoError?.message,
+        description: promoError?.description,
+        stack: promoError?.stack
+      });
+    }
 
     return res.json({
       ok: true,
