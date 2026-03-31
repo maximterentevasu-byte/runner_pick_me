@@ -560,16 +560,6 @@ async function saveScore() {
         updateBest(payload.bestScore);
         recordBadge.textContent = payload.isNewRecord ? 'Новый рекорд!' : 'Результат сохранён';
 
-        if (payload.promoType) {
-          try {
-            tg?.sendData?.(JSON.stringify({
-              type: 'promo_request',
-              promoType: payload.promoType
-            }));
-          } catch (promoRequestError) {
-            console.error('promo request send error', promoRequestError);
-          }
-        }
       } else {
         recordBadge.textContent = 'Результат не сохранён';
       }
