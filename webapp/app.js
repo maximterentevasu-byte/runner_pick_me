@@ -163,6 +163,10 @@ function startOrJump() {
 
 function restartGame() {
   resetGame();
+  showStartOverlay(false);
+  showGameOver(false);
+  statusEl.textContent = 'Бежит';
+  canvas.focus?.();
   draw();
 }
 function spawnObstacle() {
@@ -243,23 +247,16 @@ function spawnCoin() {
 }
 
 function obstacleHit(a, o) {
-  let insetX = 14, insetY = 10;
+  let insetX = 14;
+  let insetY = 10;
 
   if (o.type === 'puddle') {
-    // make puddle collision bigger and higher (so player can't step "through")
-    insetX = 10;
-    insetY = -6; // extend upward
-    return a.x + insetX < o.x + o.w &&
-           a.x + a.w - insetX > o.x &&
-           a.y < o.y + o.h + 8 &&   // extend hitbox upward
+    return a.x + 10 < o.x + o.w &&
+           a.x + a.w - 10 > o.x &&
+           a.y < o.y + o.h + 8 &&
            a.y + a.h - 6 > o.y;
   }
 
-  return a.x + insetX < o.x + o.w &&
-         a.x + a.w - insetX > o.x &&
-         a.y + insetY < o.y + o.h &&
-         a.y + a.h - insetY > o.y;
-}
   return a.x + insetX < o.x + o.w &&
          a.x + a.w - insetX > o.x &&
          a.y + insetY < o.y + o.h &&
